@@ -8,7 +8,7 @@ namespace FixSSC_Temp
     [ApiVersion(2, 1)]
     public class MainPlugin : TerrariaPlugin
     {
-        public override Version Version => new Version(1, 0, 0, 0);
+        public override Version Version => new Version(1, 0, 0, 2);
         public override string Name => "FixSSC_Temp";
         public override string Description => "临时修复ssc";
         public override string Author => "Leader";
@@ -35,6 +35,48 @@ namespace FixSSC_Temp
             TShockAPI.Hooks.PlayerHooks.PlayerPostLogin += PlayerHooks_PlayerPostLogin;
             ServerApi.Hooks.NetGetData.Register(this, OnNetGetData);
             ServerApi.Hooks.GamePostInitialize.Register(this, OnGamePostInit);
+            ServerApi.Hooks.WorldSave.Register(this, OnWorldSave);
+            ServerApi.Hooks.ServerLeave.Register(this, OnPlayerLeave);
+        }
+
+        private void OnPlayerLeave(LeaveEventArgs args)
+        {
+            var player = TShock.Players[args.Who];
+            if (Now.ContainsKey(player.Name))
+            {
+                Now[player.Name].Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
+                Now.Remove(player.Name);
+            }
+            if (Source.ContainsKey(player.Name))
+            {
+                //切换到装备栏1
+                NetMessage.TrySendData(147, -1, -1, null, player.Index, 0);
+                var now = Source[player.Name];
+                for (var i = 0; i < 20; i++)
+                {
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Armor0 + i, now.Armor0[i]);
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + i, now.Armor1[i]);
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + i, now.Armor2[i]);
+                }
+                for (var i = 0; i < 10; i++)
+                {
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Dye0 + i, now.Dye0[i]);
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye1[i]);
+                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye2[i]);
+                }
+                Source.Remove(player.Name);
+            }
+        }
+
+        private void OnWorldSave(WorldSaveEventArgs args)
+        {
+            foreach (var player in Now.Keys)
+            {
+                if (Now.ContainsKey(player))
+                {
+                    Now[player].Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
+                }
+            }
         }
 
         private void OnGamePostInit(EventArgs args)
@@ -50,7 +92,7 @@ namespace FixSSC_Temp
             }
             new Thread(() =>
             {
-                Thread.Sleep(500);
+                Thread.Sleep(1000);
                 NetMessage.SendData(147, -1, -1, null, e.Player.Index, 0);
                 //切换到装备栏1
                 var list = Player.Get(e.Player.Name);
@@ -127,92 +169,96 @@ namespace FixSSC_Temp
 
         private void OnPlayerSlot(object? sender, GetDataHandlers.PlayerSlotEventArgs e)
         {
-            if (Now.ContainsKey(e.Player.Name))
+            try
             {
-                if (e.Slot >= Terraria.ID.PlayerItemSlotID.Armor0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Armor0 + 20)
+                if (Now.ContainsKey(e.Player.Name))
                 {
-                    var data = Now[e.Player.Name];
-                    var index = e.Slot - Terraria.ID.PlayerItemSlotID.Armor0;
-                    var item = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-                    switch (Now[e.Player.Name].CurrentLoadoutIndex)
+                    if (e.Slot >= Terraria.ID.PlayerItemSlotID.Armor0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Armor0 + 20)
                     {
-                        case 0:
-                            {
-                                data.Armor0[index] = item;
-                            }
-                            break;
-                        case 1:
-                            {
-                                data.Armor1[index] = item;
-                            }
-                            break;
-                        case 2:
-                            {
-                                data.Armor2[index] = item;
-                            }
-                            break;
+                        var data = Now[e.Player.Name];
+                        var index = e.Slot - Terraria.ID.PlayerItemSlotID.Armor0;
+                        var item = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                        switch (Now[e.Player.Name].CurrentLoadoutIndex)
+                        {
+                            case 0:
+                                {
+                                    data.Armor0[index] = item;
+                                }
+                                break;
+                            case 1:
+                                {
+                                    data.Armor1[index] = item;
+                                }
+                                break;
+                            case 2:
+                                {
+                                    data.Armor2[index] = item;
+                                }
+                                break;
+                        }
+                    }
+                    else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Dye0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Dye0 + 10)
+                    {
+                        var data = Now[e.Player.Name];
+                        var index = e.Slot - Terraria.ID.PlayerItemSlotID.Dye0;
+                        var item = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                        switch (Now[e.Player.Name].CurrentLoadoutIndex)
+                        {
+                            case 0:
+                                {
+                                    data.Dye0[index] = item;
+                                }
+                                break;
+                            case 1:
+                                {
+                                    data.Dye1[index] = item;
+                                }
+                                break;
+                            case 2:
+                                {
+                                    data.Dye2[index] = item;
+                                }
+                                break;
+                        }
                     }
                 }
-                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Dye0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Dye0 + 10)
+                else
+                //装备栏1
+                if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0 + 20)
                 {
-                    var data = Now[e.Player.Name];
-                    var index = e.Slot - Terraria.ID.PlayerItemSlotID.Dye0;
-                    var item = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-                    switch (Now[e.Player.Name].CurrentLoadoutIndex)
+                    //初始化玩家
+                    //开始记录原始装备栏数据
+                    if (!Source.ContainsKey(e.Player.Name))
                     {
-                        case 0:
-                            {
-                                data.Dye0[index] = item;
-                            }
-                            break;
-                        case 1:
-                            {
-                                data.Dye1[index] = item;
-                            }
-                            break;
-                        case 2:
-                            {
-                                data.Dye2[index] = item;
-                            }
-                            break;
+                        var data = new Player() { Name = e.Player.Name };
+                        Source.Add(e.Player.Name, data);
                     }
+                    Source[e.Player.Name].Armor0[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
                 }
-            }
-            else
-            //装备栏1
-            if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0 + 20)
-            {
-                //初始化玩家
-                //开始记录原始装备栏数据
-                if (!Source.ContainsKey(e.Player.Name))
+                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0 + 10)
                 {
-                    var data = new Player() { Name = e.Player.Name };
-                    Source.Add(e.Player.Name, data);
+                    Source[e.Player.Name].Dye0[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
                 }
-                Source[e.Player.Name].Armor0[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout1_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                //装备栏2
+                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + 20)
+                {
+                    Source[e.Player.Name].Armor1[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                }
+                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + 10)
+                {
+                    Source[e.Player.Name].Dye1[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                }
+                //装备栏3
+                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + 20)
+                {
+                    Source[e.Player.Name].Armor2[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                }
+                else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0 + 10)
+                {
+                    Source[e.Player.Name].Dye2[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
+                }
             }
-            else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0 + 10)
-            {
-                Source[e.Player.Name].Dye0[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout1_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-            }
-            //装备栏2
-            else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + 20)
-            {
-                Source[e.Player.Name].Armor1[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-            }
-            else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + 10)
-            {
-                Source[e.Player.Name].Dye1[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-            }
-            //装备栏3
-            else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + 20)
-            {
-                Source[e.Player.Name].Armor2[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-            }
-            else if (e.Slot >= Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0 && e.Slot <= Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0 + 10)
-            {
-                Source[e.Player.Name].Dye2[e.Slot - Terraria.ID.PlayerItemSlotID.Loadout3_Dye_0] = new Item() { netID = e.Type, stack = e.Stack, prefix = e.Prefix };
-            }
+            catch { }
         }
 
         public static void SetPlayerInvSlot(TSPlayer player, int index)
