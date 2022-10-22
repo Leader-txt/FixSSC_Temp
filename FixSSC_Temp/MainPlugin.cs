@@ -8,7 +8,7 @@ namespace FixSSC_Temp
     [ApiVersion(2, 1)]
     public class MainPlugin : TerrariaPlugin
     {
-        public override Version Version => new Version(1, 0, 0, 2);
+        public override Version Version => new Version(1, 0, 1, 0);
         public override string Name => "FixSSC_Temp";
         public override string Description => "临时修复ssc";
         public override string Author => "Leader";
@@ -44,26 +44,30 @@ namespace FixSSC_Temp
             var player = TShock.Players[args.Who];
             if (Now.ContainsKey(player.Name))
             {
-                Now[player.Name].Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
+                Now[player.Name].UpdateThis();//.Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
                 Now.Remove(player.Name);
             }
             if (Source.ContainsKey(player.Name))
             {
                 //切换到装备栏1
-                NetMessage.TrySendData(147, -1, -1, null, player.Index, 0);
-                var now = Source[player.Name];
-                for (var i = 0; i < 20; i++)
+                try
                 {
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Armor0 + i, now.Armor0[i]);
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + i, now.Armor1[i]);
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + i, now.Armor2[i]);
+                    NetMessage.TrySendData(147, -1, -1, null, player.Index, 0);
+                    var now = Source[player.Name];
+                    for (var i = 0; i < 20; i++)
+                    {
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Armor0 + i, now.Armor0[i]);
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + i, now.Armor1[i]);
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + i, now.Armor2[i]);
+                    }
+                    for (var i = 0; i < 10; i++)
+                    {
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Dye0 + i, now.Dye0[i]);
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye1[i]);
+                        SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye2[i]);
+                    }
                 }
-                for (var i = 0; i < 10; i++)
-                {
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Dye0 + i, now.Dye0[i]);
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye1[i]);
-                    SetPlayerInvSlot(player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye2[i]);
-                }
+                catch { }
                 Source.Remove(player.Name);
             }
         }
@@ -74,7 +78,7 @@ namespace FixSSC_Temp
             {
                 if (Now.ContainsKey(player))
                 {
-                    Now[player].Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
+                    Now[player].UpdateThis();//.Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
                 }
             }
         }
@@ -93,17 +97,29 @@ namespace FixSSC_Temp
             new Thread(() =>
             {
                 Thread.Sleep(1000);
-                NetMessage.SendData(147, -1, -1, null, e.Player.Index, 0);
-                //切换到装备栏1
-                var list = Player.Get(e.Player.Name);
-                var now = new Player() { Name = e.Player.Name };
-                if (list.Any())
+                e.Player.TPlayer.CurrentLoadoutIndex = -1;
+                while (e.Player.TPlayer.CurrentLoadoutIndex != 0)
                 {
-                    now = list[0];
+                    NetMessage.SendData(147, -1, -1, null, e.Player.Index, 0);
                 }
-                else
+                //切换到装备栏1
+                var now = Player.Get(e.Player.Name);
+                if(now == null)
                 {
-                    now.Insert();
+                    now = new Player() { Name = e.Player.Name };
+                    for (int i = 0; i < 20; i++)
+                    {
+                        now.Armor0[i] = new Item();
+                        now.Armor1[i] = new Item();
+                        now.Armor2[i] = new Item();
+                    }
+                    for (int i = 0; i < 10; i++)
+                    {
+                        now.Dye0[i] = new Item();
+                        now.Dye1[i] = new Item();
+                        now.Dye2[i] = new Item();
+                    }
+                    now.Save();
                 }
                 for (var i = 0; i < 20; i++)
                 {
@@ -130,26 +146,30 @@ namespace FixSSC_Temp
         {
             if (Now.ContainsKey(e.Player.Name))
             {
-                Now[e.Player.Name].Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
+                Now[e.Player.Name].UpdateThis();//.Update(new List<string>() { "Name" }, "Dye0", "Dye1", "Dye2", "Armor0", "Armor1", "Armor2", "CurrentLoadoutIndex");
                 Now.Remove(e.Player.Name);
             }
             if (Source.ContainsKey(e.Player.Name))
             {
                 //切换到装备栏1
-                NetMessage.TrySendData(147, -1, -1, null, e.Player.Index, 0);
-                var now = Source[e.Player.Name];
-                for (var i = 0; i < 20; i++)
+                try
                 {
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Armor0 + i, now.Armor0[i]);
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + i, now.Armor1[i]);
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + i, now.Armor2[i]);
+                    NetMessage.TrySendData(147, -1, -1, null, e.Player.Index, 0);
+                    var now = Source[e.Player.Name];
+                    for (var i = 0; i < 20; i++)
+                    {
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Armor0 + i, now.Armor0[i]);
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Armor_0 + i, now.Armor1[i]);
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout3_Armor_0 + i, now.Armor2[i]);
+                    }
+                    for (var i = 0; i < 10; i++)
+                    {
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Dye0 + i, now.Dye0[i]);
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye1[i]);
+                        SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye2[i]);
+                    }
                 }
-                for (var i = 0; i < 10; i++)
-                {
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Dye0 + i, now.Dye0[i]);
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye1[i]);
-                    SetPlayerInvSlot(e.Player, i + Terraria.ID.PlayerItemSlotID.Loadout2_Dye_0 + i, now.Dye2[i]);
-                }
+                catch { }
                 Source.Remove(e.Player.Name);
             }
         }
@@ -159,6 +179,7 @@ namespace FixSSC_Temp
             if (args.Msg.readBuffer[2] != 147)
                 return;
             var player = TShock.Players[args.Msg.whoAmI];
+
             if (player.IsLoggedIn && !player.HasPermission(Permissions.bypassssc))
             {
                 if (Now.ContainsKey(player.Name))
@@ -275,8 +296,6 @@ namespace FixSSC_Temp
         }
         public static void SetPlayerInvSlot(TSPlayer player, int index, Item item)
         {
-            if (item == null)
-                item = new Item();
             using (MemoryStream data = new MemoryStream())
             {
                 using (BinaryWriter wr = new BinaryWriter(data))
